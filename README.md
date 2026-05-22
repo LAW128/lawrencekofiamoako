@@ -19,9 +19,9 @@ This portfolio showcases my work in visual identity, digital production, and pro
 
 ## 🌐 Live Demo
 You can view the live portfolio here:
-[https://yourusername.github.io/lawrencekofiamoako/](https://yourusername.github.io/lawrencekofiamoako/)
+https://law128.github.io/lawrencekofiamoako/
 
-*(Note: Replace "yourusername" with your actual GitHub username)*
+
 
 ## 🎨 Branding
 - **Role:** Graphic Designer & Media Coordinator
