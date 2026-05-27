@@ -902,277 +902,376 @@
     </div>
 
     <script>
-        // ============================================
-        // CLOUDINARY CONFIGURATION - FULLY FIXED WITH THEME TOGGLE
-        // ============================================
-        const CLOUD_NAME = "diqn01nx9";
-        const UPLOAD_PRESET = "portfolio_uploads";
-        
-        let uploadedImages = [];
-        let currentCarouselIndex = 0;
+    // ============================================
+    // DYNAMIC FOOTER YEAR
+    // ============================================
+    function updateFooterYear() {
+        const yearSpan = document.getElementById('currentYear');
+        if (yearSpan) {
+            const currentYear = new Date().getFullYear();
+            yearSpan.textContent = currentYear;
+        }
+    }
+    
+    // ============================================
+    // CLOUDINARY CONFIGURATION - GLOBAL PERSISTENCE
+    // ============================================
+    const CLOUD_NAME = "diqn01nx9";
+    const UPLOAD_PRESET = "portfolio_uploads";
+    
+    let uploadedImages = [];
+    let currentCarouselIndex = 0;
 
-        function loadImagesFromStorage() {
-            const saved = localStorage.getItem('portfolio_images');
-            if (saved) {
-                try {
-                    uploadedImages = JSON.parse(saved);
-                } catch(e) { uploadedImages = []; }
+    // ============================================
+    // LOAD IMAGES DIRECTLY FROM CLOUDINARY (NO localStorage)
+    // ============================================
+    async function loadImagesFromCloudinary() {
+        try {
+            // Fetch all images from your Cloudinary folder
+            const response = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/image/upload`, {
+                headers: {
+                    'Authorization': 'Basic ' + btoa('444248897814957:dGsS9w5vwX89H0C6sq99rExBkAk')
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.resources && data.resources.length > 0) {
+                // Filter images from your portfolio_workspace folder
+                const portfolioImages = data.resources.filter(img => img.folder === 'portfolio_workspace');
+                uploadedImages = portfolioImages.map(img => img.secure_url);
+            } else {
+                uploadedImages = [];
             }
+            
+            renderCarousel();
+        } catch (error) {
+            console.error("Error loading from Cloudinary:", error);
+            uploadedImages = [];
             renderCarousel();
         }
+    }
+
+    // ============================================
+    // SAVE IMAGE URLS TO CLOUDINARY (No localStorage needed)
+    // ============================================
+    // Note: Images are already saved in Cloudinary when uploaded.
+    // We just need to reload them after upload.
+    
+    function goToSlide(index) {
+        if (index < 0) index = 0;
+        if (index >= uploadedImages.length) index = uploadedImages.length - 1;
+        if (index === currentCarouselIndex) return;
         
-        function saveImagesToStorage() {
-            localStorage.setItem('portfolio_images', JSON.stringify(uploadedImages));
-        }
-
-        function goToSlide(index) {
-            if (index < 0) index = 0;
-            if (index >= uploadedImages.length) index = uploadedImages.length - 1;
-            if (index === currentCarouselIndex) return;
-            
-            currentCarouselIndex = index;
-            const track = document.getElementById('carouselTrack');
-            if (track) {
-                track.style.transform = `translateX(-${currentCarouselIndex * 100}%)`;
-            }
-            
-            document.querySelectorAll('.nav-dot').forEach((dot, i) => {
-                dot.classList.toggle('active', i === currentCarouselIndex);
-            });
-        }
-
-        function nextSlide() {
-            if (uploadedImages.length > 0 && currentCarouselIndex < uploadedImages.length - 1) {
-                goToSlide(currentCarouselIndex + 1);
-            }
-        }
-
-        function prevSlide() {
-            if (uploadedImages.length > 0 && currentCarouselIndex > 0) {
-                goToSlide(currentCarouselIndex - 1);
-            }
-        }
-
-        function openCloudinaryUpload() {
-            if (uploadedImages.length >= 5) {
-                alert("Maximum 5 images allowed. Delete some before uploading more.");
-                return;
-            }
-            
-            if (typeof cloudinary === 'undefined') {
-                alert("Cloudinary widget still loading. Please wait a moment and try again.");
-                return;
-            }
-            
-            const widget = cloudinary.createUploadWidget(
-                {
-                    cloudName: CLOUD_NAME,
-                    uploadPreset: UPLOAD_PRESET,
-                    sources: ['local', 'camera', 'google_drive'],
-                    multiple: false,
-                    cropping: false,
-                    folder: 'portfolio_workspace',
-                    clientAllowedFormats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-                    maxFileSize: 5000000,
-                    styles: {
-                        palette: {
-                            window: "#0f172a",
-                            sourceBg: "#1e293b",
-                            border: "#00f2fe",
-                            action: "#00f2fe",
-                            inactive: "#64748b"
-                        }
-                    }
-                },
-                (error, result) => {
-                    console.log("Upload event:", result?.event, error);
-                    
-                    if (error) {
-                        console.error("Upload error:", error);
-                        alert("Upload failed: " + (error.message || "Unknown error. Check console."));
-                        return;
-                    }
-                    
-                    if (result && result.event === "success") {
-                        const imageUrl = result.info.secure_url;
-                        uploadedImages.push(imageUrl);
-                        renderCarousel();
-                        saveImagesToStorage();
-                        updateProjectCount();
-                        alert("Image uploaded successfully!");
-                    }
-                }
-            );
-            widget.open();
-        }
-
-        function deleteImage(index) {
-            if (confirm("Remove this image from your workspace?")) {
-                uploadedImages.splice(index, 1);
-                if (currentCarouselIndex >= uploadedImages.length && uploadedImages.length > 0) {
-                    currentCarouselIndex = uploadedImages.length - 1;
-                } else if (uploadedImages.length === 0) {
-                    currentCarouselIndex = 0;
-                }
-                renderCarousel();
-                saveImagesToStorage();
-                updateProjectCount();
-            }
-        }
-        
-        function renderCarousel() {
-            const track = document.getElementById('carouselTrack');
-            const nav = document.getElementById('carouselNav');
-            if (!track || !nav) return;
-            
-            if (uploadedImages.length === 0) {
-                track.innerHTML = `<div class="carousel-slide"><div class="empty-state">✨ No images yet. Click "Upload to Cloud" — your work will be saved permanently! ✨</div></div>`;
-                nav.innerHTML = '';
-                currentCarouselIndex = 0;
-                return;
-            }
-            
-            track.innerHTML = uploadedImages.map((img, idx) => `
-                <div class="carousel-slide" data-index="${idx}">
-                    <img src="${img}" alt="Portfolio work ${idx + 1}" loading="lazy">
-                    <div class="slide-actions">
-                        <button class="btn-delete" onclick="deleteImage(${idx})" aria-label="Delete image">
-                            <svg viewBox="0 0 24 24">
-                                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-9 0v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V6H9z" stroke="currentColor" fill="none" stroke-width="2"/>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-            
-            nav.innerHTML = uploadedImages.map((_, idx) => `
-                <div class="nav-dot ${idx === currentCarouselIndex ? 'active' : ''}" data-index="${idx}"></div>
-            `).join('');
-            
+        currentCarouselIndex = index;
+        const track = document.getElementById('carouselTrack');
+        if (track) {
             track.style.transform = `translateX(-${currentCarouselIndex * 100}%)`;
-            
-            document.querySelectorAll('.nav-dot').forEach(dot => {
-                dot.addEventListener('click', (e) => {
-                    const index = parseInt(dot.dataset.index);
-                    goToSlide(index);
-                });
-            });
-            
-            updateProjectCount();
-        }
-
-        function updateProjectCount() {
-            const countEl = document.getElementById('projectCount');
-            if (countEl) countEl.textContent = uploadedImages.length;
-        }
-
-        function clearAllImages() {
-            if (uploadedImages.length > 0 && confirm("Remove ALL images from workspace?")) {
-                uploadedImages = [];
-                currentCarouselIndex = 0;
-                renderCarousel();
-                saveImagesToStorage();
-                updateProjectCount();
-            } else if (uploadedImages.length === 0) {
-                alert("No images to clear.");
-            }
-        }
-
-        function setupUploadButton() {
-            const uploadBtn = document.getElementById('cloudinaryUploadBtn');
-            if (uploadBtn) uploadBtn.addEventListener('click', openCloudinaryUpload);
-        }
-
-        function setupClearAllButton() {
-            const clearBtn = document.getElementById('clearAll');
-            if (clearBtn) clearBtn.addEventListener('click', clearAllImages);
-        }
-
-        function setupScrollReveal() {
-            const sections = document.querySelectorAll('.reveal-section');
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) entry.target.classList.add('visible');
-                });
-            }, { threshold: 0.1 });
-            sections.forEach(section => observer.observe(section));
-        }
-
-        function setupKeyboardNavigation() {
-            document.addEventListener('keydown', (e) => {
-                if (uploadedImages.length === 0) return;
-                if (e.key === 'ArrowLeft') {
-                    prevSlide();
-                    e.preventDefault();
-                } else if (e.key === 'ArrowRight') {
-                    nextSlide();
-                    e.preventDefault();
-                }
-            });
-        }
-
-        function initPortfolio() {
-            setupUploadButton();
-            setupClearAllButton();
-            loadImagesFromStorage();
-            setupScrollReveal();
-            setupKeyboardNavigation();
-            
-            const savedTheme = localStorage.getItem('portfolio_theme');
-            if (savedTheme) {
-                document.documentElement.setAttribute('data-theme', savedTheme);
-            } else {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            }
-            
-            const themeToggle = document.getElementById('themeToggleBtn');
-            if (themeToggle) {
-                themeToggle.addEventListener('click', () => {
-                    const current = document.documentElement.getAttribute('data-theme');
-                    const next = current === 'light' ? 'dark' : 'light';
-                    document.documentElement.setAttribute('data-theme', next);
-                    localStorage.setItem('portfolio_theme', next);
-                    
-                    themeToggle.style.transform = 'scale(0.95)';
-                    setTimeout(() => { themeToggle.style.transform = ''; }, 150);
-                });
-            }
-            
-            const menuToggle = document.getElementById('menuToggle');
-            const navLinks = document.getElementById('navLinks');
-            if (menuToggle && navLinks) {
-                menuToggle.addEventListener('click', () => {
-                    menuToggle.classList.toggle('active');
-                    navLinks.classList.toggle('mobile-open');
-                    document.body.classList.toggle('menu-locked');
-                });
-                navLinks.querySelectorAll('a').forEach(link => {
-                    link.addEventListener('click', () => {
-                        menuToggle.classList.remove('active');
-                        navLinks.classList.remove('mobile-open');
-                        document.body.classList.remove('menu-locked');
-                    });
-                });
-            }
-            
-            const scrollTriggerBtn = document.getElementById('scrollTrigger');
-            if (scrollTriggerBtn) {
-                scrollTriggerBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
-                window.addEventListener('scroll', () => {
-                    const isAtBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 50;
-                    scrollTriggerBtn.classList.toggle('at-bottom', isAtBottom);
-                });
-            }
         }
         
-        document.addEventListener('DOMContentLoaded', () => {
-            initPortfolio();
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(() => console.log('PWA Service Worker Registered'))
-                    .catch((err) => console.log('PWA Registration failed:', err));
+        document.querySelectorAll('.nav-dot').forEach((dot, i) => {
+            dot.classList.toggle('active', i === currentCarouselIndex);
+        });
+    }
+
+    function nextSlide() {
+        if (uploadedImages.length > 0 && currentCarouselIndex < uploadedImages.length - 1) {
+            goToSlide(currentCarouselIndex + 1);
+        }
+    }
+
+    function prevSlide() {
+        if (uploadedImages.length > 0 && currentCarouselIndex > 0) {
+            goToSlide(currentCarouselIndex - 1);
+        }
+    }
+
+    function openCloudinaryUpload() {
+        if (uploadedImages.length >= 5) {
+            alert("Maximum 5 images allowed. Delete some before uploading more.");
+            return;
+        }
+        
+        if (typeof cloudinary === 'undefined') {
+            alert("Cloudinary widget still loading. Please wait a moment and try again.");
+            return;
+        }
+        
+        const widget = cloudinary.createUploadWidget(
+            {
+                cloudName: CLOUD_NAME,
+                uploadPreset: UPLOAD_PRESET,
+                sources: ['local', 'camera', 'google_drive'],
+                multiple: false,
+                cropping: false,
+                folder: 'portfolio_workspace',
+                clientAllowedFormats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+                maxFileSize: 5000000,
+                styles: {
+                    palette: {
+                        window: "#0f172a",
+                        sourceBg: "#1e293b",
+                        border: "#00f2fe",
+                        action: "#00f2fe",
+                        inactive: "#64748b"
+                    }
+                }
+            },
+            (error, result) => {
+                console.log("Upload event:", result?.event, error);
+                
+                if (error) {
+                    console.error("Upload error:", error);
+                    alert("Upload failed: " + (error.message || "Unknown error. Check console."));
+                    return;
+                }
+                
+                if (result && result.event === "success") {
+                    // Reload all images from Cloudinary after successful upload
+                    alert("Image uploaded successfully! Refreshing gallery...");
+                    loadImagesFromCloudinary();
+                }
+            }
+        );
+        widget.open();
+    }
+
+    async function deleteImageFromCloudinary(publicId, index) {
+        try {
+            // Delete from Cloudinary using API (requires backend - alternative approach)
+            // For now, we'll just reload the gallery after manual deletion
+            // Note: Full deletion requires a backend server or Cloudinary Media Library
+            
+            // Instead of full deletion, we'll just reload the gallery
+            // To actually delete, you'll need to use Cloudinary Admin API
+            alert("To delete permanently, please use Cloudinary Media Library dashboard.");
+            loadImagesFromCloudinary();
+        } catch (error) {
+            console.error("Delete error:", error);
+        }
+    }
+
+    function deleteImage(index) {
+        if (confirm("Remove this image from your workspace? (Note: Permanently deleting from Cloudinary requires dashboard access)")) {
+            // For now, we'll just reload the gallery
+            loadImagesFromCloudinary();
+        }
+    }
+    
+    function renderCarousel() {
+        const track = document.getElementById('carouselTrack');
+        const nav = document.getElementById('carouselNav');
+        if (!track || !nav) return;
+        
+        if (uploadedImages.length === 0) {
+            track.innerHTML = `<div class="carousel-slide"><div class="empty-state">✨ No images yet. Click "Upload to Cloud" — your work will be visible on all devices! ✨</div></div>`;
+            nav.innerHTML = '';
+            currentCarouselIndex = 0;
+            return;
+        }
+        
+        track.innerHTML = uploadedImages.map((img, idx) => `
+            <div class="carousel-slide" data-index="${idx}">
+                <img src="${img}" alt="Portfolio work ${idx + 1}" loading="lazy">
+                <div class="slide-actions">
+                    <button class="btn-delete" onclick="deleteImage(${idx})" aria-label="Delete image">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-9 0v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V6H9z" stroke="currentColor" fill="none" stroke-width="2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        
+        nav.innerHTML = uploadedImages.map((_, idx) => `
+            <div class="nav-dot ${idx === currentCarouselIndex ? 'active' : ''}" data-index="${idx}"></div>
+        `).join('');
+        
+        track.style.transform = `translateX(-${currentCarouselIndex * 100}%)`;
+        
+        document.querySelectorAll('.nav-dot').forEach(dot => {
+            dot.addEventListener('click', (e) => {
+                const index = parseInt(dot.dataset.index);
+                goToSlide(index);
+            });
+        });
+        
+        updateProjectCount();
+    }
+
+    function updateProjectCount() {
+        const countEl = document.getElementById('projectCount');
+        if (countEl) countEl.textContent = uploadedImages.length;
+    }
+
+    function clearAllImages() {
+        if (uploadedImages.length > 0 && confirm("Remove ALL images from workspace? (Note: This only clears the display. Images remain in Cloudinary.)")) {
+            uploadedImages = [];
+            currentCarouselIndex = 0;
+            renderCarousel();
+        } else if (uploadedImages.length === 0) {
+            alert("No images to clear.");
+        }
+    }
+
+    function setupUploadButton() {
+        const uploadBtn = document.getElementById('cloudinaryUploadBtn');
+        if (uploadBtn) uploadBtn.addEventListener('click', openCloudinaryUpload);
+    }
+
+    function setupClearAllButton() {
+        const clearBtn = document.getElementById('clearAll');
+        if (clearBtn) clearBtn.addEventListener('click', clearAllImages);
+    }
+
+    function setupScrollReveal() {
+        const sections = document.querySelectorAll('.reveal-section');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) entry.target.classList.add('visible');
+            });
+        }, { threshold: 0.1 });
+        sections.forEach(section => observer.observe(section));
+    }
+
+    function setupKeyboardNavigation() {
+        document.addEventListener('keydown', (e) => {
+            if (uploadedImages.length === 0) return;
+            if (e.key === 'ArrowLeft') {
+                prevSlide();
+                e.preventDefault();
+            } else if (e.key === 'ArrowRight') {
+                nextSlide();
+                e.preventDefault();
             }
         });
-    </script>
+    }
+
+    function setupSkillsAnimation() {
+        const skillsCard = document.getElementById('skillsCard');
+        if (!skillsCard) return;
+        
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    skillsCard.classList.add('animate');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.3 });
+        
+        observer.observe(skillsCard);
+    }
+
+    function setupScrollButton() {
+        const scrollBtn = document.getElementById('scrollTrigger');
+        if (!scrollBtn) return;
+        
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 300) {
+                scrollBtn.classList.add('visible');
+            } else {
+                scrollBtn.classList.remove('visible');
+            }
+            
+            const isAtBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 50;
+            if (isAtBottom) {
+                scrollBtn.classList.add('at-bottom');
+            } else {
+                scrollBtn.classList.remove('at-bottom');
+            }
+        });
+        
+        window.dispatchEvent(new Event('scroll'));
+        
+        scrollBtn.addEventListener('click', () => {
+            const isAtBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 50;
+            
+            if (isAtBottom) {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                const sections = ['#about', '#services', '#projects', '#contact'];
+                let currentIndex = -1;
+                
+                for (let i = 0; i < sections.length; i++) {
+                    const section = document.querySelector(sections[i]);
+                    if (section) {
+                        const rect = section.getBoundingClientRect();
+                        if (rect.top <= 200 && rect.bottom >= 100) {
+                            currentIndex = i;
+                            break;
+                        }
+                    }
+                }
+                
+                if (currentIndex >= 0 && currentIndex < sections.length - 1) {
+                    const nextSection = document.querySelector(sections[currentIndex + 1]);
+                    if (nextSection) {
+                        nextSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                } else {
+                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                }
+            }
+        });
+    }
+
+    function initPortfolio() {
+        updateFooterYear();
+        setupSkillsAnimation();
+        setupUploadButton();
+        setupClearAllButton();
+        loadImagesFromCloudinary(); // Load from Cloudinary, not localStorage
+        setupScrollReveal();
+        setupKeyboardNavigation();
+        setupScrollButton();
+        
+        const savedTheme = localStorage.getItem('portfolio_theme');
+        if (savedTheme) {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        } else {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+        
+        const themeToggle = document.getElementById('themeToggleBtn');
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => {
+                const current = document.documentElement.getAttribute('data-theme');
+                const next = current === 'light' ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', next);
+                localStorage.setItem('portfolio_theme', next);
+                
+                themeToggle.style.transform = 'scale(0.95)';
+                setTimeout(() => { themeToggle.style.transform = ''; }, 150);
+            });
+        }
+        
+        const menuToggle = document.getElementById('menuToggle');
+        const navLinks = document.getElementById('navLinks');
+        if (menuToggle && navLinks) {
+            menuToggle.addEventListener('click', () => {
+                menuToggle.classList.toggle('active');
+                navLinks.classList.toggle('mobile-open');
+                document.body.classList.toggle('menu-locked');
+            });
+            navLinks.querySelectorAll('a').forEach(link => {
+                link.addEventListener('click', () => {
+                    menuToggle.classList.remove('active');
+                    navLinks.classList.remove('mobile-open');
+                    document.body.classList.remove('menu-locked');
+                });
+            });
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        initPortfolio();
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js')
+                .then(() => console.log('PWA Service Worker Registered'))
+                .catch((err) => console.log('PWA Registration failed:', err));
+        }
+    });
+</script>
 </body>
 </html>
